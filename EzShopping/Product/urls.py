@@ -9,4 +9,5 @@ urlpatterns = [
     path('productOfShop/<str:pk>/<int:begin>/<int:end>/', views.GetListProductOfShop.as_view()),
     path('searchbyciteria/', views.SearchByCiteria.as_view()),
     path('searchbyclass/', views.SearchByClass.as_view()),
+    path('delete/<int:pk>/', views.DeleteProduct.as_view()),
 ]

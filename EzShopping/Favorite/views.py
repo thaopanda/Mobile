@@ -22,8 +22,9 @@ class CreateAndDeleteFavorite(APIView):
             product.total_like = product.total_like-1
             product.save()
             favorite[0].delete()
+            return Response(f'Unlike successfully')
         else:
             product.total_like = product.total_like+1
             product.save()
             Favorite.objects.createFavorite(user,product)
-        return Response(f'ok')
+            return Response(f'Like successfully')

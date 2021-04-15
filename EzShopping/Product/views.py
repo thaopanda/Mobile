@@ -11,6 +11,7 @@ from django_filters import rest_framework as rf
 from Product.models import Product
 from User.models import MyUser, Customer, Seller
 from ProductImage.models import ProductImage
+from Favorite.models import Favorite
 
 class CreateProductView(APIView):
     permission_classes = (IsAuthenticated,)
@@ -26,21 +27,20 @@ class CreateProductView(APIView):
         status = serializers.CharField()
         product_class = serializers.CharField(max_length=30)
         vendor = serializers.CharField(max_length=100)
-        headImage = serializers.ListField(child=serializers.CharField())
+        # headImage = serializers.ListField(child=serializers.CharField())
 
         class Meta:
             model = Product
-            fields = ['id','product_name', 'price', 'description','unit', 'in_stock', 'status', 'product_class', 'seller', 'vendor', 'headImage' ]
+            fields = ['id','product_name', 'price', 'description','unit', 'in_stock', 'status', 'product_class', 'seller', 'vendor' ]
 
     def post(self, request, format=None):
         serializer = self.CreateProductSerializer(data=request.data)
+        image = serializer.initial_data['headImage']
         if(serializer.is_valid()):
-            image =serializer.validated_data['headImage']
             seller = Seller.objects.get(email=request.user.email)
-            product = serializer.save(seller=seller, headImage=image[0])
-            print(product)
-            for i in image:
-                ProductImage.objects.CreateProductImage(product=product, image=i)
+            product = serializer.save(seller=seller)
+            for i in range(len(image)):
+                ProductImage.objects.CreateProductImage(product=product, image=image[i], priority=i+1)
             return Response(f'ok')
         return Response(f'not ok')
 
@@ -56,23 +56,23 @@ class UpdateProductView(APIView):
         status = serializers.CharField()
         product_class = serializers.CharField(max_length=30)
         vendor = serializers.CharField(max_length=100)
-        headImage = serializers.ListField(child=serializers.CharField())
 
         class Meta:
             model = Product
-            fields = ['id','product_name', 'price', 'description','unit', 'in_stock', 'status', 'product_class', 'vendor', 'headImage' ]
+            fields = ['id','product_name', 'price', 'description','unit', 'in_stock', 'status', 'product_class', 'vendor' ]
 
     def put(self, request, pk, format=None):
         product = Product.objects.get(pk=pk)
         serializer = self.UpdateProductSerializer(product, data=request.data)
+        image =serializer.initial_data['headImage']
+
         if(serializer.is_valid()):
-            image =serializer.validated_data['headImage']
-            product = serializer.save(headImage=image[0])
+            product = serializer.save()
             productImage = ProductImage.objects.filter(product=product)
             for i in productImage:
                 i.delete()
-            for i in image:
-                ProductImage.objects.CreateProductImage(product=product, image=i)
+            for i in range(len(image)):
+                ProductImage.objects.CreateProductImage(product=product, image=image[i], priority=i+1)
             return Response(f'ok')
         return Response(f'not ok')
 
@@ -100,17 +100,21 @@ class GetProductDetail(APIView):
         if(request.user.is_anonymous or request.user.user_type == 'renter'):
             productDetail[0].total_views = productDetail[0].total_views + 1
             productDetail[0].save()
-
-        # response = {
-        #     'data': serializer.data[0],
-        # }
+        if(request.user.is_anonymous == False):
+            favortie = Favorite.objects.filter(product=pk, customer = request.user)
+            if(len(favortie)>0):
+                serializer.data[0]['like'] = True
+            else:
+                serializer.data[0]['like'] = False
+        if(serializer.data[0]['commentNum']==0):
+            serializer.data[0]['averageRate'] = "Not have rate yet"
         return Response(serializer.data[0])
 
 class GetListProductOfShop(APIView):
     class ListProductOfShop(serializers.ModelSerializer):
         class Meta:
             model = Product
-            fields = ['id','sold', 'headImage', 'vendor', 'price']
+            fields = ['id','sold', 'vendor', 'price', 'product_name']
     
     def get(self, request, pk, begin, end, format=None):
         seller = Seller.objects.filter(username=pk)
@@ -123,7 +127,7 @@ class SearchByCiteria(generics.ListAPIView):
     class SearchSerializer(serializers.ModelSerializer):
         class Meta:
             model = Product
-            fields = ['id','sold', 'headImage', 'vendor', 'price']
+            fields = ['id','sold', 'vendor', 'price', 'product_name']
 
     class SearchFilter(django_filters.FilterSet):
         vendor = django_filters.CharFilter(
@@ -150,7 +154,7 @@ class SearchByClass(generics.ListAPIView):
     class SearchByClassSerializer(serializers.ModelSerializer):
         class Meta:
             model = Product
-            fields = ['id','sold', 'headImage', 'vendor', 'price']
+            fields = ['id','sold','vendor', 'price', 'product_name']
 
     class SearchByClassFilter(django_filters.FilterSet):
         product_class = django_filters.CharFilter(
@@ -169,6 +173,17 @@ class SearchByClass(generics.ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+class DeleteProduct(APIView):
+    permission_classes = (IsAuthenticated,)
+    def post(self, request, pk, format=None):
+        product = Product.objects.get(pk=pk)
+        print(request.user)
+        print(product.seller.email)
+        if(request.user.email == product.seller.email):
+            product.delete()
+            return Response(f'ok')
+        return Response(f'Dont have permission to delete')
 
 # class HostPostListSerializer(serializers.ModelSerializer):
 #         class Meta:

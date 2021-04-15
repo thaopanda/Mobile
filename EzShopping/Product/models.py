@@ -32,8 +32,10 @@ class Product(models.Model):
     
     total_like = models.PositiveIntegerField(default=0)
 
-    headImage = models.TextField(default='')
     commentNum = models.PositiveIntegerField(default=0)
+
+    averageRate = models.FloatField(default=0.0)
+    
     sold = models.PositiveIntegerField(default=0)
 
 # id int [pk, increment]

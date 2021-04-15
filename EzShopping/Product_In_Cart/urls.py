@@ -5,4 +5,5 @@ from Product_In_Cart import views
 urlpatterns = [
     path('productCart/', views.ProductCartView.as_view()),
     path('getListProductCart/', views.GetListProductInCart.as_view()),
+    path('deleteProductCart/<int:pk>/', views.DeleteProductCart.as_view()),
 ]
