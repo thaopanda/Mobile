@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'Comment',
     'ProductImage',
     'Favorite',
+    'Rating',
+    'OrderDetail'
 ]
 
 MIDDLEWARE = [
@@ -154,7 +156,7 @@ REST_FRAMEWORK = {
 JWT_AUTH = { 
     'JWT_AUTH_HEADER_PREFIX': 'JWT',
     'JWT_SECRET_KEY': SECRET_KEY,
-    'JWT_EXPIRATION_DELTA': timedelta(days=1),
+    'JWT_EXPIRATION_DELTA': timedelta(days=60),
     'JWT_ENCODE_HANDLER':
     'rest_framework_jwt.utils.jwt_encode_handler',
 

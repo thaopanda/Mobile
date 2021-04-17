@@ -11,57 +11,83 @@ from django_filters import rest_framework as rf
 from User.models import Customer, Seller
 from Product.models import Product
 from Order.models import Order
+from OrderDetail.models import OrderDetail
+
+PAGE_SIZE = 5
 
 class CreateOrderView(APIView):
     permission_classes = (IsAuthenticated,)
-
-    class CreateOrderSerializer(serializers.ModelSerializer):
+    class OrderSerializer(serializers.ModelSerializer):
+        seller = serializers.SlugRelatedField(
+            read_only=True, slug_field='fullname', many=True)
         customer = serializers.SlugRelatedField(
             read_only=True, slug_field='fullname', many=True)
-        # seller = serializers.SlugRelatedField(
-        #     read_only=True, slug_field='fullname', many=True)
-        # product = serializers.SlugRelatedField(
-        #     read_only=True, slug_field='fullname', many=True)
-        product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
-        amount = serializers.FloatField()
-        ship_cost =serializers.FloatField()
-
         class Meta:
             model = Order
-            fields = ['id','customer', 'product', 'amount', 'ship_cost']
+            fields = ['id', 'customer', 'seller']
 
     def post(self, request, format=None):
-        serializer = self.CreateOrderSerializer(data=request.data)
-
-        if(serializer.is_valid()):
+        msg="Cannot create order"
+        try:
+            ship_cost=0.0
+            msg = "Not provide orderDetail"
+            orderDetail = request.data['orderDetail']
+            print(orderDetail)
+            product = Product.objects.get(pk=orderDetail[0]['product'])
+            msg = "Cannot create order"
             customer = Customer.objects.get(email=request.user.email)
-            product = serializer.validated_data['product']
-            print(product)
-            print(product.seller)
-            serializer.save(customer=customer, order_status='waiting', seller= product.seller)
-            return Response(f'ok')
-        return Response(f'not ok')
+            order = Order.objects.CreateOrder(seller=product.seller, customer=customer, order_status="waiting", ship_cost=ship_cost)
+            print(order)
+            product_cost = 0
+            for i in orderDetail:
+                product = Product.objects.get(pk=i['product'])
+                product_cost += i['amount']* product.price
+                OrderDetail.objects.CreateOrderDetail(order=order, product=product, amount=i['amount'])
+            order.product_cost = product_cost
+            order.save()
+            response = {
+                "success":True
+            }
+            return Response(response)
+        except Exception:
+            
+            response = {
+                "success":False,
+                "msg":msg
+            }
+            return Response(response)
 
 # get list order following status
 class GetListOrderOfCustomer(APIView):
     class ListOrderSerializer(serializers.ModelSerializer):
         class Meta:
             model = Order
-            fields = ['order_status', 'amount', 'ship_cost', 'product']
+            fields = ['id','order_status', 'ship_cost', 'product_cost']
 
     def get(self, request, format=None):
-        order = Order.objects.filter(customer = request.user)
-        serializer = self.ListOrderSerializer(order, many=True)
-        for i in serializer.data:
-            product = Product.objects.get(pk = i['product'])
-            i['product'] = {'product_name':product.product_name, 'headImage':product.headImage}
-        return Response(serializer.data)
+        try:
+            page = request.query_params['page']
+            end = int(page)*PAGE_SIZE
+            begin = end-PAGE_SIZE
+            order = Order.objects.filter(customer = request.user)[begin: end]
+            serializer = self.ListOrderSerializer(order, many=True)
+
+            # detail = OrderDetail.objects.filter
+            # for i in serializer.data:
+            #     product = Product.objects.get(pk = i['product'])
+            #     i['product'] = {'product_name':product.product_name}
+            return Response(serializer.data)
+        except Exception:
+            response = {
+                "success":False
+            }
+            return Response(response)
 
 class GetListOrderOfShop(generics.ListAPIView):
     class ListOrderSerializer(serializers.ModelSerializer):
         class Meta:
             model = Order
-            fields = ['order_status', 'amount', 'ship_cost', 'product']
+            fields = ['id','order_status', 'ship_cost', 'product_cost']
 
     class OrderFilter(django_filters.FilterSet):
         order_status = django_filters.CharFilter(
@@ -71,37 +97,66 @@ class GetListOrderOfShop(generics.ListAPIView):
             model = Order
             fields = ['order_status']
 
-    queryset = Order.objects.all()
+    
     serializer_class = ListOrderSerializer
     filter_backends = (rf.DjangoFilterBackend,)
     filterset_class = OrderFilter
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
+        try:
+            page = request.query_params['page']
+            end = int(page)*PAGE_SIZE
+            begin = end-5
+            seller = Seller.objects.get(email = request.user.email)
+            queryset = Order.objects.filter(seller=seller)[begin:end]
+            serializer = self.get_serializer(queryset, many=True)
 
-        for i in serializer.data:
-            product = Product.objects.get(pk = i['product'])
-            i['product'] = {'product_name':product.product_name, 'headImage':product.headImage}
-    
-        return Response(serializer.data)
+            # for i in serializer.data:
+            #     product = Product.objects.get(pk = i['product'])
+            #     i['product'] = {'product_name':product.product_name}
+            return Response(serializer.data)
+        except Exception:
+            response = {
+                "success":False
+            }
+            return Response(response)
 
-class AcceptNewOrder(APIView):
-    def put(self, request, pk, format=None):
-        order = Order.objects.get(pk=pk)
-        print(request.user.username)
-        print(order.seller)
-        # if request.user.username == order.seller:
-        order.order_status = 'accepted'
-        order.save()
-        return Response(f'ok')
-        # return Response(f'not ok')
+class GetOrderDetail(APIView):
+    class OrderDetailSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = OrderDetail
+            fields = ['product', 'amount']
 
-class DeniedNewOrder(APIView):
-    def put(self, request, pk, format=None):
-        order = Order.objects.get(pk=pk)
-        # if request.user.username == order.seller:
-        order.order_status = 'denied'
-        order.save()
-        return Response(f'ok')
-        # return Response(f'not ok')
+    def get(self, request, format=None):
+        try:
+            order = request.query_params['order']
+            orderDetail = OrderDetail.objects.filter(order=order)
+            serializer = self.OrderDetailSerializer(orderDetail, many=True)
+            response = {
+                "success":True,
+                "orderDetail": serializer.data
+            } 
+            return Response(response)
+        except Exception:
+            response = {
+                "success":False
+            }
+            return Response(response)
+
+class ChangeOrderStatus(APIView):
+    def put(self, request, format=None):
+        try:
+            pk = request.query_params['order']
+            order = Order.objects.get(pk=pk)
+            order.order_status = request.data['order_status']
+            order.save()
+            response = {
+                "success":True
+            }
+            return Response(response)
+        except Exception:
+            response = {
+                "success":False
+            }
+        return Response(response)
+        

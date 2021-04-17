@@ -3,5 +3,5 @@ from django.urls import path
 from Favorite import views
 
 urlpatterns = [
-    path('createDelete/<int:pk>/', views.CreateAndDeleteFavorite.as_view()),
+    path('createDelete/', views.CreateAndDeleteFavorite.as_view()),
 ]

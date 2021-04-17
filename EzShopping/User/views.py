@@ -63,8 +63,16 @@ class CustomerRegistrationView(APIView):
         serializer = self.CustomerRegistrationSerializer(data=request.data)
         if(serializer.is_valid()):
             Customer.objects.create_user(email=serializer.validated_data['email'], username=serializer.validated_data['username'], password=serializer.validated_data['password'])
-            return Response(serializer.data)
-        return Response(serializer.errors)
+            response = {
+                "success":True
+            }
+            return Response(response)
+
+        response ={
+            "success":False,
+            "msg": serializer.errors
+        }
+        return Response(response)
 
 class LoginView(APIView):
     permission_classes = (AllowAny,)
@@ -96,15 +104,17 @@ class LoginView(APIView):
         serializer = self.LoginViewSerializer(data=request.data)
         if(serializer.is_valid()):
             response = {
-            'success' : 'True',
-            'message': 'User logged in  successfully',
+            'success' : True,
             'username':serializer.data['username'],
             'email': serializer.data['email'],
             'token' : serializer.data['token'],
             'user_type':serializer.data['user_type']
             }
             return Response(response)
-        return Response(f'not ok')
+        response = {
+            "success":False
+        }
+        return Response(response)
 
 class SellerRegistrationView(APIView):
     permission_classes = (AllowAny,)
@@ -140,6 +150,7 @@ class SellerRegistrationView(APIView):
         serializer = self.SellerRegistrationSerializer(data=request.data)
         if(serializer.is_valid()):
             category = ','.join(map(str, serializer.validated_data['shopCategory']))
+
             Seller.objects.create_user(email=serializer.validated_data['email'], 
                                     username=serializer.validated_data['username'], 
                                     password=serializer.validated_data['password'], 
@@ -149,8 +160,13 @@ class SellerRegistrationView(APIView):
                                     phoneNumber=serializer.validated_data['phoneNumber'],
                                     shopName= serializer.validated_data['shopName'],
                                     shopCategory=category)
-            return Response(serializer.data)
-        return Response(serializer.errors)
+            response = {"success":True}
+            return Response(response)
+        response ={
+            "success":False,
+            "msg": serializer.errors
+        }
+        return Response(response)
 
 class CustomerProfileView(APIView):
     permission_classes = (IsAuthenticated,)
@@ -180,58 +196,57 @@ class SellerProfileView(APIView):
 
 class CustomerUpdateProfileView(APIView):
     permission_classes = (IsAuthenticated,)
-    class CustomerUpdateProfileSerializer(serializers.ModelSerializer):
-        fullname = serializers.CharField(
-            validators=[RegexValidator(regex=fullname_validator)]
-        )
-        gender = serializers.ChoiceField(choices=GENDER)
-        phone = serializers.CharField(max_length=10)
-        class Meta:
-            model = Customer
-            fields = ['fullname', 'gender', 'phone']
     def put(self, request, format=None):
         customer = Customer.objects.get(email=request.user.email)
-        print(customer)
-        serializer = self.CustomerUpdateProfileSerializer(customer, data=request.data)
-        print(serializer)
-        if(serializer.is_valid()):
-            serializer.save()
-            return Response(f'ok')
-        return Response(f'not ok')
-# cannot update with phone =""
+        try:
+            customer.fullname = request.data['fullname']
+        except Exception:
+            pass
+
+        try:
+            customer.gender = request.data['gender']
+        except Exception:
+            pass
+
+        try:
+            customer.phone = request.data['phone']
+        except Exception:
+            pass
+        customer.save()
+        response = {
+            "success":True
+        }
+        return Response(response)
+
 
 class SellerUpdateProfileView(APIView):
     permission_classes = (IsAuthenticated,)
-    class SellerUpdateProfileSerializer(serializers.ModelSerializer):
-        fullname = serializers.CharField(
-            required=True,
-            validators=[RegexValidator(regex=fullname_validator)]
-        )
-        identication = serializers.CharField(
-            validators=[RegexValidator(regex=identication_validator), UniqueValidator(queryset=Seller.objects.all())]
-        )
-        phoneNumber = serializers.CharField(
-            validators=[RegexValidator(regex=phoneNumber_validator), UniqueValidator(queryset=Seller.objects.all())]
-        )
-        address = serializers.CharField(
-            validators=[RegexValidator(regex=address_validator)]
-        )
-        class Meta:
-            model = Seller
-            fields = ['fullname', 'identication', 'address', 'phoneNumber']
-    
     def put(self, request, format=None):
         seller = Seller.objects.get(email=request.user.email)
-        # if(Seller.has_update_permission is False):
-        #     return Response(f'not ok')
-        serializer = self.SellerUpdateProfileSerializer(seller, data=request.data)
-        if(serializer.is_valid()):
-            serializer.save()
-            # adminUser = MyUser.objects.get(email='EasyAccomd@gmail.com')
-            # message = 'Có người cho thuê cập nhật thông tin cần phê duyệt'
-            # Notification.objects.CreateNotification(adminUser, message )
-            return Response(f'ok')
-        return Response(f'not ok')
+        try:
+            seller.fullname = request.data['fullname']
+        except Exception:
+            pass
+
+        try:
+            seller.identication = request.data['identication']
+        except Exception:
+            pass
+
+        try:
+            seller.phoneNumber = request.data['phoneNumber']
+        except Exception:
+            pass
+
+        try:
+            seller.address = request.data['address']
+        except Exception:
+            pass
+        seller.save()
+        response = {
+            "success":True
+        }
+        return Response(response)
 
 class SetAvatar(APIView):
     permission_classes = (IsAuthenticated,)
@@ -274,10 +289,24 @@ class ChangePassword(APIView):
         changePassword = self.ChangePasswordSerializer(user, data=request.data)
         if(changePassword.is_valid()):
             if(user.check_password(changePassword.validated_data['password']) is False):
-                return Response(f'incorrect old password')
+                response = {
+                    "success":False,
+                    "msg":'incorrect old password'
+                }
+                return Response(response)
             if(changePassword.validated_data['password']==changePassword.validated_data['new_password']):
-                return Response(f'new password must be different from old password')
+                response = {
+                    "success":False,
+                    "msg":'new password must be different from old password'
+                }
+                return Response(response)
             user.set_password(changePassword.validated_data['new_password'])
             user.save()
-            return Response(f'ok')
-        return Response(f'not ok')
+            response = {
+                'success':True
+            }
+            return Response(response)
+        response = {
+            'success':False
+        }
+        return Response(response)

@@ -16,8 +16,6 @@ class ProductCartView(APIView):
     permission_classes = (IsAuthenticated,)
 
     class ProductCartSerializer(serializers.ModelSerializer):
-        # customer = serializers.SlugRelatedField(
-        #     read_only=True, slug_field='fullname', many=True)
         product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
         amount = serializers.FloatField()
 
@@ -26,33 +24,75 @@ class ProductCartView(APIView):
             fields = ['id','amount', 'product' ]
 
     def post(self, request, format=None):
-        serializer = self.ProductCartSerializer(data=request.data)
-        if(serializer.is_valid()):
+        productInCart = Product_In_Cart.objects.filter(product = request.data['product'], customer = request.user)
+        if(len(productInCart)>0):
+            try:
+                amount = request.data['amount']
+                productInCart[0].amount = productInCart[0].amount+ int(amount)
+                productInCart[0].save()
+            except:
+                response = {
+                    "success":False,
+                    "msg": "Do not provide amount"
+                }
+                return Response(response)
+            response = {
+                "success": True,
+                "msg":"Add more amount to product in cart"
+            }
+            return Response(response)
+        else:
+            serializer = self.ProductCartSerializer(data = request.data)
             customer = Customer.objects.get(email=request.user.email)
-            serializer.save(customer=customer)
-            return Response(f'ok')
-        return Response(f'This product have been delete or cannot found this product')
+            if(serializer.is_valid()):
+                serializer.save(customer=customer)
+                response = {
+                    "success":True,
+                    "msg": "Add product to cart"
+                }
+                return Response(response)
+            response = {
+                "success":False,
+                "msg":"Not enough data to add product to cart"
+            }
+            return Response(response)
 
 class GetListProductInCart(APIView):
     class ProductInCartList(serializers.ModelSerializer):
         class Meta:
             model = Product_In_Cart
-            fields = ['amount', 'product']
+            fields = ['id','amount', 'product']
 
     def get(self, request, format=None):
-        product_in_cart = Product_In_Cart.objects.filter(customer = request.user)
-        serializer = self.ProductInCartList(product_in_cart, many=True)
-        for i in serializer.data:
-            product = Product.objects.get(pk = i['product'])
-            i['product'] = {'id':product.id, 'product_name':product.product_name, 'headImage':product.headImage}
-        return Response(serializer.data)
+        try:
+            product_in_cart = Product_In_Cart.objects.filter(customer = request.user)
+            serializer = self.ProductInCartList(product_in_cart, many=True)
+            for i in serializer.data:
+                product = Product.objects.get(pk = i['product'])
+                i['product'] = {'id':product.id, 'product_name':product.product_name}
+            return Response(serializer.data)
+        except Exception:
+            response = {
+                "success":False
+            }
+            return Response(response)
 
 class DeleteProductCart(APIView):
     permission_classes = (IsAuthenticated,)
-    def post(self, request, pk, format=None):
-        product_in_cart = Product_In_Cart.objects.get(pk=pk)
-        if(request.user.email == product_in_cart.customer.email):
-            product_in_cart.delete()
-            return Response(f'ok')
-        return Response(f'Dont have permission to delete')
+    def post(self, request, format=None):
+        try:
+            pk = request.query_params['product_in_cart']
+            product_in_cart = Product_In_Cart.objects.get(pk=pk)
+            if(request.user.email == product_in_cart.customer.email):
+                product_in_cart.delete()
+                response = {
+                    "success":True
+                }
+                return Response(response)
+        except Exception:
+            response = {
+                "success":False,
+                "msg":"cannot find this product_in_cart"
+            }
+            return Response(response)
     

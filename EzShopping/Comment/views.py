@@ -17,28 +17,32 @@ class CreateAndUpdateComment(APIView):
     class CommentSerializer(serializers.ModelSerializer):
         customer = serializers.SlugRelatedField(
             read_only=True, slug_field='username', many=True)
-        rating = serializers.IntegerField()
         class Meta:
             model = Comment
-            fields = ['content', 'image', 'product', 'customer', 'rating']
+            fields = ['content', 'image', 'product', 'customer']
 
     def post(self, request, format = None):
-        print(request.data)
         comment = Comment.objects.filter(product=request.data['product'], customer= request.user)
         if len(comment)>0:
-            serializer = self.CommentSerializer(comment[0], data=request.data)
-            if(serializer.is_valid()):
-                serializer.save()
-                allComment = Comment.objects.filter(product=request.data['product'])
-                totalRate = 0
-                for i in allComment:
-                    totalRate+= i.rating
-                averageRate = round(totalRate/len(allComment),1)
-                product = Product.objects.get(pk=request.data['product'])
-                product.averageRate = averageRate
-                product.save()
-                return Response(f'Update successfully')
-            return Response('Lack information to update')
+            try:
+                content = request.data['content']
+                comment[0].content = content
+                comment[0].save()
+            except Exception:
+                pass
+
+            try:
+                image = request.data['image']
+                comment[0].image = image
+                comment[0].save()
+            except Exception:
+                pass
+            response = {
+                "success":True,
+                "msg":"Update comment successfully"
+            }
+                
+            return Response(response)
         else:
             serializer = self.CommentSerializer(data=request.data)
             if(serializer.is_valid()):
@@ -47,46 +51,42 @@ class CreateAndUpdateComment(APIView):
                 total_comment = serializer.validated_data['product'].commentNum +1
                 serializer.validated_data['product'].commentNum = total_comment
                 serializer.validated_data['product'].save()
-
-                allComment = Comment.objects.filter(product=request.data['product'])
-                totalRate = 0
-                for i in allComment:
-                    totalRate+= i.rating
-                averageRate = round(totalRate/len(allComment),1)
-                product = Product.objects.get(pk=request.data['product'])
-                product.averageRate = averageRate
-                product.save()
-                return Response(f'Create comment successfully')
-            return Response(f'Lake information to create comment')
+                response = {
+                    "success":True,
+                    "msg":'Create comment successfully'
+                }
+                return Response(response)
+            response = {
+                "success":False,
+                "msg":'Lack information to create comment'
+            }
+            return Response(response)
 
 class GetProductComment(APIView):
     class ProductCommentSerializer(serializers.ModelSerializer):
-        # customer = serializers.SlugRelatedField(
-        #     read_only=True, slug_field='fullname')
         class Meta:
             model = Comment
             fields = ['content', 'image', 'customer']
 
-    def get(self, request, pk, begin, end, format=None):
-        comment = Comment.objects.filter(product=pk)
+    def get(self, request, format=None):
+        try:
+            pk = request.query_params['product']
+            page = request.query_params['page']
+            end = 5*int(page)
+            begin = end-5
+            comment = Comment.objects.filter(product=int(pk))[begin:end]
+        except Exception:
+            response = {
+                "success":False,
+                "msg":"Not provide productID"
+            }
+            return Response(response)
         serializer = self.ProductCommentSerializer(comment, many=True)
         for i in serializer.data:
             customer = Customer.objects.get(id=i['customer'])
             i['customer'] = {'username':customer.username, 'image':customer.image}
-        return Response(serializer.data)
-
-# class UpdateComment(APIView):
-#     permission_classes = (IsAuthenticated,)
-#     class UpdateCommentSerializer(serializers.ModelSerializer):
-#         rating = serializers.IntegerField()
-#         class Meta:
-#             model = Comment
-#             fields = ['content', 'image', 'product','rating']
-
-#     def put(self, request, pk, format = None):
-#         comment = Comment.objects.get(pk=pk)
-#         serializer = self.UpdateCommentSerializer(comment, data=request.data)
-#         if(serializer.is_valid()):
-#             serializer.save()
-#             return Response(f'ok')
-#         return Response(f'not ok')
+            response = {
+                "success":True,
+                "comment":serializer.data
+            }
+        return Response(response)

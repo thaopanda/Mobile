@@ -6,7 +6,7 @@ urlpatterns = [
     path('create/', views.CreateOrderView.as_view()),
     path('listOrderOfCustomer/', views.GetListOrderOfCustomer.as_view()),
     path('listOrderOfShop/', views.GetListOrderOfShop.as_view()),
-    path('acceptOrder/<int:pk>/', views.AcceptNewOrder.as_view()),
-    path('denyOrder/<int:pk>/', views.DeniedNewOrder.as_view()),
+    path('changeOrderStatus/', views.ChangeOrderStatus.as_view()),
+    path('orderDetail/', views.GetOrderDetail.as_view()),
 
 ]

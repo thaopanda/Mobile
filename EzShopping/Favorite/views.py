@@ -14,17 +14,35 @@ from Favorite.models import Favorite
 
 class CreateAndDeleteFavorite(APIView):
     permission_classes = (IsAuthenticated,)
-    def post(self, request,pk, format=None):
+    def post(self, request, format=None):
+        try:
+            pk = request.query_params['product']
+            product = Product.objects.get(pk=pk)
+        except Exception:
+            response = {
+                "success": False,
+                "msg":"Not provide productID"
+            }
         user = Customer.objects.get(email=request.user.email)
-        product = Product.objects.get(pk=pk)
+        
         favorite = Favorite.objects.filter(customer=user, product=product)
         if(len(favorite)!=0):
+            total_like = product.total_like-1
             product.total_like = product.total_like-1
             product.save()
             favorite[0].delete()
-            return Response(f'Unlike successfully')
+            response = {
+                "success":True,
+                "total_like": total_like
+            }
+            return Response(response)
         else:
+            total_like = product.total_like+1
             product.total_like = product.total_like+1
             product.save()
             Favorite.objects.createFavorite(user,product)
-            return Response(f'Like successfully')
+            response = {
+                "success":True,
+                "total_like": total_like
+            }
+            return Response(response)

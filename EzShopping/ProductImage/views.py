@@ -19,8 +19,26 @@ class GetProductImage(APIView):
             model = ProductImage
             fields = ['image']
 
-    def get(self, request, pk, begin, end, format = None):
-        image = ProductImage.objects.filter(product=pk)[begin:end]
-        serializer = self.ProductImageSerializer(image, many=True)
-        return Response(serializer.data)
+    def get(self, request, format = None):
+        try:
+            pk = request.query_params['product']
+            query_type = request.query_params['type']
+            if(query_type=="all"):
+                image = ProductImage.objects.filter(product=pk)[1:]
+            else:
+                image = ProductImage.objects.filter(product=pk)[0:1]
+            serializer = self.ProductImageSerializer(image, many=True)
+            image = list()
+            for i in serializer.data:
+                image.append(i['image'])
+            response = {
+                "success":True,
+                "image":image
+            }
+            return Response(response)
+        except Exception:
+            response = {
+                "success":False,
+            }
+            return Response(response)
 
