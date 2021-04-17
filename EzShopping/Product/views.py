@@ -226,7 +226,7 @@ class SearchByClass(generics.ListAPIView):
     class SearchByClassSerializer(serializers.ModelSerializer):
         class Meta:
             model = Product
-            fields = ['id','sold','vendor', 'price', 'product_name']
+            fields = '__all__'
 
     class SearchByClassFilter(django_filters.FilterSet):
         product_class = django_filters.CharFilter(
